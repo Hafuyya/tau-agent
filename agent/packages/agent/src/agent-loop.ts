@@ -161,6 +161,9 @@ async function runLoop(
 	streamFn?: StreamFn,
 ): Promise<void> {
 	let firstTurn = true;
+	let hasEditedFiles = false;
+	let textOnlyNudges = 0;
+	const MAX_TEXT_ONLY_NUDGES = 2;
 	// Check for steering messages at start (user may have typed while waiting)
 	let pendingMessages: AgentMessage[] = (await config.getSteeringMessages?.()) || [];
 
@@ -203,12 +206,37 @@ async function runLoop(
 
 			const toolResults: ToolResultMessage[] = [];
 			if (hasMoreToolCalls) {
+				// Track if any edit/write tool was called
+				for (const tc of toolCalls) {
+					if (tc.type === "toolCall" && (tc.name === "edit" || tc.name === "write")) {
+						hasEditedFiles = true;
+					}
+				}
 				toolResults.push(...(await executeToolCalls(currentContext, message, config, signal, emit)));
 
 				for (const result of toolResults) {
 					currentContext.messages.push(result);
 					newMessages.push(result);
 				}
+			}
+
+			// If model returned text-only (no tool calls) and hasn't edited files yet,
+			// nudge it to make edits instead of just planning
+			if (!hasMoreToolCalls && !hasEditedFiles && textOnlyNudges < MAX_TEXT_ONLY_NUDGES) {
+				textOnlyNudges++;
+				const nudge: AgentMessage = {
+					role: "user",
+					content: [{ type: "text", text: "Do not plan — make your edits now using the edit tool. Start with the first file." }],
+					timestamp: Date.now(),
+				};
+				await emit({ type: "turn_end", message, toolResults });
+				await emit({ type: "turn_start" });
+				await emit({ type: "message_start", message: nudge });
+				await emit({ type: "message_end", message: nudge });
+				currentContext.messages.push(nudge);
+				newMessages.push(nudge);
+				hasMoreToolCalls = true;
+				continue;
 			}
 
 			await emit({ type: "turn_end", message, toolResults });
