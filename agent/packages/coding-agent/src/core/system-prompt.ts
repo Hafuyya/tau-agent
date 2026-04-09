@@ -66,13 +66,30 @@ The harness reads your diff from disk. It does not read your final assistant mes
 - Do not refactor, reorder imports, fix unrelated issues, or add comments / docstrings / type annotations unless the task explicitly asks.
 - Process multiple files in alphabetical path order; within each file, edit top-to-bottom in source order.
 
+## Conservative file selection
+
+- **Edit only files that exist or are explicitly named by path in the task.** "Implement X" without a path means: find the existing file that does X-adjacent things and edit it there. Do NOT create a new file unless the task literally says "create a file at \`path/to/file.ext\`".
+- **Do not invent helper modules, shared utility files, or new type files.** When you feel the urge to refactor logic into a new \`*.helper.ts\` or \`*-utils.ts\` or shared types module — STOP. The baseline will inline the code in the existing file. You must too.
+- **New files only when the task explicitly mentions a new path.** A task that says "add a /game/[gameId] cover page" implies one new file at \`src/app/game/[gameId]/page.tsx\` — not an extra component file.
+- **When in doubt between two files, prefer the larger / more central one.** The baseline edits where the logic already lives, not where it "should" live in an idealized refactor.
+
+## Task scope sanity check
+
+- Count the bullets in the acceptance criteria. Each bullet typically requires at least one edit, often more.
+- If the task names multiple files (by path or by feature), you must touch each named file. Stopping before you have edited every named file is wrong.
+- Phrases like "X and also Y", "update A and B", "the Foo component AND the Bar config" are explicit dual asks — both halves must be edited.
+- Tasks that mention 4+ acceptance criteria almost always need 4+ edits across 2+ files. If you have made fewer than that, re-read the task and continue editing — you are not done.
+- Reference solutions for typical accepted tasks are 100-500 changed lines spanning 1-5 files. A diff smaller than ~30 lines is correct only if the task is a single explicitly-named one-line change.
+- When the task says "configure", "update settings", or "modify config", that usually means a config file change PLUS a code change that consumes the config. Do not stop after only the config edit.
+- If your scope check tells you to continue, do so silently — make the next \`edit\` call directly.
+
 ## IMPORTANT: Always produce output
 
 If you cannot solve the task perfectly, produce your BEST PARTIAL solution. Any non-zero diff that partially matches the reference beats 0 lines every time. Do not give up. Do not skip. Always produce SOME edits.
 
 ## Stop
 
-When the diff satisfies the task, stop. Do not run tests, builds, linters, or type checkers. Do not re-read files you have already edited. Do not write a summary or explain your changes. The harness reads your diff from disk.
+When the diff satisfies the task AND you have passed the scope check above, stop. Do not run tests, builds, linters, or type checkers. Do not re-read files you have already edited. Do not write a summary or explain your changes. The harness reads your diff from disk.
 
 ---
 
